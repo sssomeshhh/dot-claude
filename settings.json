@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "effortLevel": "high",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
+      "Grep",
+      "Glob",
+      "LS",
+      "MultiEdit"
+    ],
+    "deny": [
+      "Read(*/.env)",
+      "Read(*/.env.*)",
+      "Read(*/secrets/**)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash /home/sh/.claude/scripts/statusline.sh"
+  },
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/sh/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/sh/.claude/hooks/session-end.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

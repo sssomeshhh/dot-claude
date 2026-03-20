@@ -1,0 +1,47 @@
+# Credentials and secrets
+.credentials.json
+
+# Conversation history
+history.jsonl
+
+# Usage statistics cache
+stats-cache.json
+
+# Per-project session logs and memory (260M+, project-scoped not user-scoped)
+projects/
+
+# Debug logs (129M+, transient)
+debug/
+
+# File edit history (17M+, transient)
+file-history/
+
+# Plugins downloaded from marketplace (reproducible via settings.json enabledPlugins)
+plugins/
+
+# Session runtime state (ephemeral, recreated each session)
+sessions/
+session-env/
+shell-snapshots/
+
+# Conversation-scoped plans and tasks (not durable config)
+plans/
+tasks/
+todos/
+
+# Transient caches and temp data
+cache/
+paste-cache/
+backups/
+
+# IDE project config
+.idea/
+
+# IDE integration state (runtime)
+ide/
+
+# Downloads (temporary)
+downloads/
+
+# Telemetry (runtime)
+telemetry/

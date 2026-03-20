@@ -1,0 +1,62 @@
+{
+  "skill_name": "threads",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I've been going back and forth with my team about our database migration strategy. We decided on PostgreSQL over MySQL because of the JSONB support and better partitioning. We're going with Flyway for migrations instead of Liquibase. Schema-first approach, not code-first. Still haven't figured out whether to do a big-bang migration or incremental with dual writes. Also need to decide on connection pooling — PgBouncer vs built-in. Oh and there's a question about whether we partition the audit log table by month or by year.\n\nSave this as a thread.",
+      "expected_output": "A new thread file in .claude/threads/ with kebab-case filename, YAML frontmatter (status: active, description, summary, last_updated), populated Context section, Decisions table with the 3 decisions (PostgreSQL, Flyway, schema-first), Open Items listing the 3 unresolved questions (migration strategy, connection pooling, partition granularity), and a regenerated INDEX.md.",
+      "files": [],
+      "expectations": [
+        "A .md file is created in .claude/threads/ with a kebab-case filename",
+        "The file has YAML frontmatter with status, summary, description, and last_updated fields",
+        "The frontmatter status is 'active'",
+        "The Decisions table contains PostgreSQL over MySQL, Flyway over Liquibase, and schema-first approach",
+        "The Open Items section lists the unresolved questions about migration strategy, connection pooling, and partition granularity",
+        "An INDEX.md file is created or regenerated with the new thread listed",
+        "The INDEX.md groups threads by status"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What were we working on? I want to continue the API redesign discussion.\n\nOK so we've decided on the webhook stuff — let's go with at-least-once delivery with idempotency keys. Also, for the search API, we'll go with a dedicated /v2/search endpoint. But now I'm realizing the webhook system is getting complex enough that it probably deserves its own thread — the delivery retry logic, event schemas, consumer SDK, that's a whole separate workstream. Can you fork that out?",
+      "expected_output": "Session start shows available threads. The api-redesign thread is loaded. Two decisions are added (webhook delivery: at-least-once, search: dedicated endpoint). Those open items are resolved. A new thread is forked for webhooks with the relevant content extracted, parent/child relationships set with auto-sync, and INDEX.md regenerated with both threads.",
+      "files": [
+        "conversation-threads-workspace/test-fixtures/test-2/.claude/threads/api-redesign.md",
+        "conversation-threads-workspace/test-fixtures/test-2/.claude/threads/INDEX.md"
+      ],
+      "expectations": [
+        "The api-redesign thread's Decisions table now includes webhook delivery (at-least-once with idempotency keys) and search API (dedicated /v2/search endpoint)",
+        "The corresponding open items are removed from api-redesign",
+        "A new kebab-case thread file is created for the webhook subsystem",
+        "The new webhook thread has frontmatter with status: active",
+        "The new webhook thread has a related field with parent: api-redesign (or similar)",
+        "The api-redesign thread has a related field with child: the-new-webhook-thread",
+        "INDEX.md is regenerated and lists both threads",
+        "The api-redesign thread's last_updated is updated"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Let me see my threads.\n\nOK a few things. First — the data-pipeline and monitoring-alerting threads are closely related (the pipeline metrics feed into the monitoring stack). Link them. Second — the frontend-rewrite is done, we shipped it last week. Close it. Third — actually, I realize monitoring-alerting should really be merged into data-pipeline since all the monitoring decisions are about pipeline metrics anyway. Merge monitoring into data-pipeline.",
+      "expected_output": "Session start shows 3 threads. Link is added between data-pipeline and monitoring-alerting (bidirectional). Frontend-rewrite is closed (open items warned about or handled). Monitoring-alerting is merged into data-pipeline — decisions and open items combined, monitoring-alerting marked closed with 'merged into data-pipeline', supersedes/superseded-by relationships set. INDEX.md regenerated showing data-pipeline as active, frontend-rewrite and monitoring-alerting as closed.",
+      "files": [
+        "conversation-threads-workspace/test-fixtures/test-3/.claude/threads/data-pipeline.md",
+        "conversation-threads-workspace/test-fixtures/test-3/.claude/threads/monitoring-alerting.md",
+        "conversation-threads-workspace/test-fixtures/test-3/.claude/threads/frontend-rewrite.md",
+        "conversation-threads-workspace/test-fixtures/test-3/.claude/threads/INDEX.md"
+      ],
+      "expectations": [
+        "data-pipeline has a related entry for monitoring-alerting",
+        "monitoring-alerting has a related entry for data-pipeline",
+        "frontend-rewrite status is changed to 'closed'",
+        "The skill warns about unresolved open items in frontend-rewrite before closing",
+        "monitoring-alerting's decisions are merged into data-pipeline's Decisions table",
+        "monitoring-alerting's open items are merged into data-pipeline's Open Items",
+        "monitoring-alerting status is 'closed' with summary mentioning merge",
+        "data-pipeline has supersedes: monitoring-alerting in related",
+        "monitoring-alerting has superseded-by: data-pipeline in related",
+        "INDEX.md is regenerated with correct status groupings"
+      ]
+    }
+  ]
+}
