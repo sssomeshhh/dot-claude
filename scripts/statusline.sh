@@ -10,6 +10,8 @@ rl5h_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty' |
 rl7d=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty' | cut -d. -f1)
 rl7d_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty' | cut -d. -f1)
 agent=$(echo "$input" | jq -r '.agent.name // "default"')
+lines_added=$(echo "$input" | jq -r '.cost.total_lines_added // "0"')
+lines_removed=$(echo "$input" | jq -r '.cost.total_lines_removed // "0"')
 effort="${CLAUDE_CODE_EFFORT_LEVEL:-}"
 
 # Git branch from cwd
@@ -150,10 +152,17 @@ line1="${sec1} ${D}|${R} ${sec2}"
 [ -n "$sec5" ] && line1="${line1} ${D}|${R} ${sec5}"
 [ -n "$sec3" ] && line1="${line1} ${D}|${R} ${sec3}${S}:${R}${sec7}" || line1="${line1} ${D}|${R} ${sec7}"
 
-# Line 2: config+context | rate limits
+# Section 8: lines added/removed (hidden when both 0)
+sec8=""
+if [ "$lines_added" -gt 0 ] 2>/dev/null || [ "$lines_removed" -gt 0 ] 2>/dev/null; then
+  sec8="\033[38;5;65m+${lines_added}${R}${S}/${R}\033[38;5;131m-${lines_removed}${R}"
+fi
+
+# Line 2: config+context | rate limits | lines
 line2=""
 [ -n "$sec4" ] && line2="${sec4}"
 [ -n "$sec6" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec6}" || line2="${sec6}"; }
+[ -n "$sec8" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec8}" || line2="${sec8}"; }
 
 printf "%b\n" "$line1"
 [ -n "$line2" ] && printf "%b" "$line2"
