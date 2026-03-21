@@ -11,6 +11,7 @@ fi
 
 # Create default entry in thread state (session exists, no thread loaded)
 if [ -n "$session_id" ]; then
+  mkdir -p "$(dirname "$state_file")"
   touch "$state_file"
   # Remove any stale entry for this session_id, then add empty entry
   grep -v "^${session_id}=" "$state_file" 2>/dev/null > "${state_file}.tmp" || true
