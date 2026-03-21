@@ -5,6 +5,11 @@ session_id=$(echo "$input" | jq -r '.session_id // empty')
 model=$(echo "$input" | jq -r '.model.id // empty')
 ctx=$(echo "$input" | jq -r '.context_window.used_percentage // empty' | cut -d. -f1)
 ctx_size=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
+rl5h=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty' | cut -d. -f1)
+rl5h_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty' | cut -d. -f1)
+rl7d=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty' | cut -d. -f1)
+rl7d_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty' | cut -d. -f1)
+agent=$(echo "$input" | jq -r '.agent.name // "default"')
 effort="${CLAUDE_CODE_EFFORT_LEVEL:-}"
 
 # Git branch from cwd
@@ -28,10 +33,11 @@ C_HOST="\033[38;5;23m"
 C_DIR="\033[38;5;24m"
 C_BRANCH="\033[38;5;117m"
 C_MODEL="\033[38;5;103m"
-C_EFFORT="\033[38;5;146m"
+C_EFFORT="\033[38;5;60m"
 C_THREAD="\033[38;5;104m"
 C_PROGRESS="\033[38;5;147m"
 C_WIN="\033[38;5;66m"
+C_AGENT="\033[38;5;146m"
 
 # Dynamic context color
 if [ -n "$ctx" ]; then
@@ -51,12 +57,11 @@ sec1="${C_HOST}$(hostname -s | tr '[:upper:]' '[:lower:]')${R}${S}:${R}${C_USER}
 sec2="${C_DIR}$(basename "$cwd")${R}"
 [ -n "$branch" ] && sec2="${sec2}${S}:${R}${C_BRANCH}${branch}${R}"
 
-# Section 3: model:effort
+# Section 3: model (no effort — effort moved to L2)
 sec3=""
 [ -n "$model" ] && sec3="${C_MODEL}${model}${R}"
-[ -n "$model" ] && [ -n "$effort" ] && sec3="${sec3}${S}:${R}${C_EFFORT}${effort}${R}"
 
-# Section 4: window_size:ctx%
+# Section 4: effort:window_size:ctx% (effort conditionally prefixed)
 sec4=""
 if [ -n "$ctx" ]; then
   win=""
@@ -67,10 +72,11 @@ if [ -n "$ctx" ]; then
       win="$((ctx_size / 1000))k"
     fi
   fi
+  [ -n "$effort" ] && sec4="${C_EFFORT}${effort}${R}${S}-${R}"
   if [ -n "$win" ]; then
-    sec4="${C_WIN}${win}${R}${S}:${R}${C_CTX}${ctx}%${R}"
+    sec4="${sec4}${C_WIN}${win}${R}${S}:${R}${C_CTX}${ctx}%${R}"
   else
-    sec4="${C_CTX}${ctx}%${R}"
+    sec4="${sec4}${C_CTX}${ctx}%${R}"
   fi
 fi
 
@@ -93,10 +99,61 @@ if [ -n "$thread" ] && [ "$thread" != "none" ]; then
   fi
 fi
 
-# Join with dark gray pipes
-out="${sec1} ${D}|${R} ${sec2}"
-[ -n "$sec5" ] && out="${out} ${D}|${R} ${sec5}"
-[ -n "$sec3" ] && out="${out} ${D}|${R} ${sec3}"
-[ -n "$sec4" ] && out="${out} ${D}|${R} ${sec4}"
+# Format seconds remaining as human-readable duration
+fmt_remaining() {
+  local now reset diff d h m
+  now=$(date +%s)
+  reset=$1
+  diff=$((reset - now))
+  [ "$diff" -le 0 ] && return
+  d=$((diff / 86400))
+  h=$(( (diff % 86400) / 3600 ))
+  m=$(( (diff % 3600) / 60 ))
+  if [ "$d" -gt 0 ]; then
+    echo "${d}d${h}h"
+  elif [ "$h" -gt 0 ]; then
+    echo "${h}h${m}m"
+  else
+    echo "${m}m"
+  fi
+}
 
-printf "%b" "$out"
+# Section 6: rate limits (5h and/or 7d, conditionally present)
+sec6=""
+if [ -n "$rl5h" ]; then
+  if [ "$rl5h" -ge 80 ]; then C_RL="\033[38;5;131m"
+  elif [ "$rl5h" -ge 50 ]; then C_RL="\033[38;5;137m"
+  else C_RL="\033[38;5;65m"; fi
+  sec6="${C_WIN}5h${R}${S}:${R}${C_RL}${rl5h}%${R}"
+  if [ -n "$rl5h_reset" ]; then
+    ttl=$(fmt_remaining "$rl5h_reset")
+    [ -n "$ttl" ] && sec6="${sec6}${S}(${R}${C_WIN}${ttl}${R}${S})${R}"
+  fi
+fi
+if [ -n "$rl7d" ]; then
+  if [ "$rl7d" -ge 80 ]; then C_RL="\033[38;5;131m"
+  elif [ "$rl7d" -ge 50 ]; then C_RL="\033[38;5;137m"
+  else C_RL="\033[38;5;65m"; fi
+  [ -n "$sec6" ] && sec6="${sec6} "
+  sec6="${sec6}${C_WIN}7d${R}${S}:${R}${C_RL}${rl7d}%${R}"
+  if [ -n "$rl7d_reset" ]; then
+    ttl=$(fmt_remaining "$rl7d_reset")
+    [ -n "$ttl" ] && sec6="${sec6}${S}(${R}${C_WIN}${ttl}${R}${S})${R}"
+  fi
+fi
+
+# Section 7: agent name (always shown, defaults to "default")
+sec7="${C_AGENT}${agent}${R}"
+
+# Line 1: identity — host:user | dir:branch | thread:progress | model:agent
+line1="${sec1} ${D}|${R} ${sec2}"
+[ -n "$sec5" ] && line1="${line1} ${D}|${R} ${sec5}"
+[ -n "$sec3" ] && line1="${line1} ${D}|${R} ${sec3}${S}:${R}${sec7}" || line1="${line1} ${D}|${R} ${sec7}"
+
+# Line 2: config+context | rate limits
+line2=""
+[ -n "$sec4" ] && line2="${sec4}"
+[ -n "$sec6" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec6}" || line2="${sec6}"; }
+
+printf "%b\n" "$line1"
+[ -n "$line2" ] && printf "%b" "$line2"
