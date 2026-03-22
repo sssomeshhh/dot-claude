@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+TARGET_DIR="$HOME/.claude"
+
+ITEMS=(
+  CLAUDE.md
+  README.md
+  keybindings.json
+  settings.json
+  hooks
+  scripts
+  skills
+)
+
+# Classify each item
+declare -a to_skip=() to_relink=() to_conflict=() to_link=()
+
+for item in "${ITEMS[@]}"; do
+  src="$REPO_DIR/$item"
+  dst="$TARGET_DIR/$item"
+
+  if [ -L "$dst" ]; then
+    current="$(readlink -f "$dst")"
+    expected="$(readlink -f "$src")"
+    if [ "$current" = "$expected" ]; then
+      to_skip+=("$item")
+    else
+      to_relink+=("$item")
+    fi
+  elif [ -e "$dst" ]; then
+    to_conflict+=("$item")
+  else
+    to_link+=("$item")
+  fi
+done
+
+# Summary
+echo "dot-claude configure"
+echo "  source: $REPO_DIR"
+echo "  target: $TARGET_DIR"
+echo ""
+
+if [ ${#to_skip[@]} -gt 0 ]; then
+  echo "already linked:"
+  for item in "${to_skip[@]}"; do echo "  $item"; done
+fi
+
+if [ ${#to_relink[@]} -gt 0 ]; then
+  echo "relink (symlink points elsewhere):"
+  for item in "${to_relink[@]}"; do echo "  $item"; done
+fi
+
+if [ ${#to_conflict[@]} -gt 0 ]; then
+  echo "conflict (existing file/dir is not a symlink):"
+  for item in "${to_conflict[@]}"; do echo "  $item"; done
+fi
+
+if [ ${#to_link[@]} -gt 0 ]; then
+  echo "link (new):"
+  for item in "${to_link[@]}"; do echo "  $item"; done
+fi
+
+if [ ${#to_conflict[@]} -gt 0 ]; then
+  echo ""
+  echo "error: existing non-symlink files/dirs found — remove or move them manually."
+  exit 1
+fi
+
+changes=("${to_relink[@]}" "${to_link[@]}")
+if [ ${#changes[@]} -eq 0 ]; then
+  echo ""
+  echo "nothing to do — all items already linked."
+  exit 0
+fi
+
+echo ""
+read -rp "proceed? [y/N] " answer
+if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+  echo "aborted."
+  exit 1
+fi
+
+# Remove stale symlinks
+for item in "${to_relink[@]}"; do
+  rm "$TARGET_DIR/$item"
+done
+
+# Create symlinks
+for item in "${to_relink[@]}" "${to_link[@]}"; do
+  ln -s "$REPO_DIR/$item" "$TARGET_DIR/$item"
+  echo "linked: $item"
+done
+
+echo "done."
