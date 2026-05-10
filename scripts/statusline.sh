@@ -13,10 +13,24 @@ rl7d_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty' |
 agent=$(echo "$input" | jq -r '.agent.name // "default"')
 lines_added=$(echo "$input" | jq -r '.cost.total_lines_added // "0"')
 lines_removed=$(echo "$input" | jq -r '.cost.total_lines_removed // "0"')
-effort="${CLAUDE_CODE_EFFORT_LEVEL:-}"
+effort=$(echo "$input" | jq -r '.effort.level // empty')
+version=$(echo "$input" | jq -r '.version // empty')
+fast_mode=$(echo "$input" | jq -r '.fast_mode // false')
+total_dur_ms=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
+api_dur_ms=$(echo "$input" | jq -r '.cost.total_api_duration_ms // 0')
+cost_usd=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 
 # Git branch from current_dir (reflects worktrees correctly)
 branch=$(git -C "$git_cwd" rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+# Worktree indicator: "root" when at project root, else relpath to worktree top
+wt_top=$(git -C "$git_cwd" rev-parse --show-toplevel 2>/dev/null)
+wt=""
+if [ -n "$wt_top" ] && [ "$wt_top" = "$cwd" ]; then
+  wt="root"
+elif [ -n "$wt_top" ]; then
+  wt=$(realpath --relative-to="$cwd" "$wt_top" 2>/dev/null)
+fi
 
 # Thread name from state file
 thread=""
@@ -41,6 +55,9 @@ C_THREAD="\033[38;5;104m"
 C_PROGRESS="\033[38;5;147m"
 C_WIN="\033[38;5;66m"
 C_AGENT="\033[38;5;146m"
+C_MUTED="\033[38;5;102m"
+C_GOLD="\033[38;5;178m"
+C_AMBER="\033[38;5;137m"
 
 # Dynamic context color
 if [ -n "$ctx" ]; then
@@ -53,14 +70,16 @@ if [ -n "$ctx" ]; then
   fi
 fi
 
-# Section 1: host:user
+# Section 1: host:user[:version]
 sec1="${C_HOST}$(hostname -s | tr '[:upper:]' '[:lower:]')${R}${S}:${R}${C_USER}$(whoami)${R}"
+[ -n "$version" ] && sec1="${sec1}${S}:${R}${C_MUTED}${version}${R}"
 
-# Section 2: dir:branch
+# Section 2: dir:branch:wt
 sec2="${C_DIR}$(basename "$cwd")${R}"
 [ -n "$branch" ] && sec2="${sec2}${S}:${R}${C_BRANCH}${branch}${R}"
+[ -n "$wt" ] && sec2="${sec2}${S}:${R}${C_MUTED}${wt}${R}"
 
-# Section 3: identity — model:window:effort:agent
+# Section 3: identity — model:window:effort:agent[ · ⚡]
 model="${model#claude-}"; model="${model%%\[*}"; model=$(echo "$model" | sed 's/\([0-9]\)-\([0-9]\)/\1.\2/g')
 win=""
 if [ -n "$ctx_size" ]; then
@@ -75,8 +94,9 @@ sec3=""
 [ -n "$win" ] && { [ -n "$sec3" ] && sec3="${sec3}${S}:${R}${C_EFFORT}${win}${R}" || sec3="${C_EFFORT}${win}${R}"; }
 [ -n "$effort" ] && { [ -n "$sec3" ] && sec3="${sec3}${S}:${R}${C_EFFORT}${effort}${R}" || sec3="${C_EFFORT}${effort}${R}"; }
 [ -n "$sec3" ] && sec3="${sec3}${S}:${R}${C_AGENT}${agent}${R}" || sec3="${C_AGENT}${agent}${R}"
+[ "$fast_mode" = "true" ] && sec3="${sec3} ${D}·${R} ${C_GOLD}⚡${R}"
 
-# Section 4: usage — ctx:% + rate limits (space-joined, uniform label:percent)
+# Section 4: usage — ctx:%
 sec4=""
 [ -n "$ctx" ] && sec4="${C_WIN}ctx${R}${S}:${R}${C_CTX}${ctx}%${R}"
 
@@ -99,12 +119,9 @@ if [ -n "$thread" ] && [ "$thread" != "none" ]; then
   fi
 fi
 
-# Format seconds remaining as human-readable duration
-fmt_remaining() {
-  local now reset diff d h m
-  now=$(date +%s)
-  reset=$1
-  diff=$((reset - now))
+# Format absolute seconds as human-readable duration (Xd Xh / XhXm / Xm)
+fmt_duration_seconds() {
+  local diff=$1 d h m
   [ "$diff" -le 0 ] && return
   d=$((diff / 86400))
   h=$(( (diff % 86400) / 3600 ))
@@ -116,6 +133,13 @@ fmt_remaining() {
   else
     echo "${m}m"
   fi
+}
+
+# Format seconds remaining until a future timestamp
+fmt_remaining() {
+  local now
+  now=$(date +%s)
+  fmt_duration_seconds $(($1 - now))
 }
 
 # Section 6: rate limits (5h and/or 7d, conditionally present)
@@ -142,22 +166,55 @@ if [ -n "$rl7d" ]; then
   fi
 fi
 
-# Line 1: identity — host:user | dir:branch | thread:progress
+# Active and API durations from cost data (ms → seconds → formatted)
+active_dur=""
+[ "$total_dur_ms" -gt 0 ] 2>/dev/null && active_dur=$(fmt_duration_seconds $((total_dur_ms / 1000)))
+api_dur=""
+[ "$api_dur_ms" -gt 0 ] 2>/dev/null && api_dur=$(fmt_duration_seconds $((api_dur_ms / 1000)))
+
+# Cost formatted to 2 decimals (only when > 0)
+cost_str=""
+if [ -n "$cost_usd" ] && [ "$cost_usd" != "null" ]; then
+  gt_zero=$(awk -v c="$cost_usd" 'BEGIN { print (c > 0) ? 1 : 0 }')
+  [ "$gt_zero" = "1" ] && cost_str=$(printf "%.2f" "$cost_usd")
+fi
+
+# Lines added/removed (hidden when both 0)
+lines_str=""
+if [ "$lines_added" -gt 0 ] 2>/dev/null || [ "$lines_removed" -gt 0 ] 2>/dev/null; then
+  lines_str="\033[38;5;65m+${lines_added}${R}${S}/${R}\033[38;5;131m-${lines_removed}${R}"
+fi
+
+# Productivity pair: +N/-N (active_dur) — rendered as L1 4th group
+prod=""
+[ -n "$lines_str" ] && prod="$lines_str"
+if [ -n "$active_dur" ]; then
+  active_paren="${S}(${R}${C_WIN}${active_dur}${R}${S})${R}"
+  [ -n "$prod" ] && prod="${prod} ${active_paren}" || prod="$active_paren"
+fi
+
+# Economics pair: $cost (api_dur) — L2 output group
+econ=""
+if [ -n "$cost_str" ]; then
+  econ="${S}\$${R}${C_AMBER}${cost_str}${R}"
+  [ -n "$api_dur" ] && econ="${econ} ${S}(${R}${C_WIN}${api_dur}${R}${S})${R}"
+fi
+
+# Line 1: host:user[:version] | dir:branch:wt | thread:progress | +N/-N (active_Tm)
 line1="${sec1} ${D}|${R} ${sec2}"
 [ -n "$sec5" ] && line1="${line1} ${D}|${R} ${sec5}"
+[ -n "$prod" ] && line1="${line1} ${D}|${R} ${prod}"
 
-# Section 7: lines added/removed (hidden when both 0)
+# Section 7: economics only (productivity moved to L1)
 sec7=""
-if [ "$lines_added" -gt 0 ] 2>/dev/null || [ "$lines_removed" -gt 0 ] 2>/dev/null; then
-  sec7="\033[38;5;65m+${lines_added}${R}${S}/${R}\033[38;5;131m-${lines_removed}${R}"
-fi
+[ -n "$econ" ] && sec7="$econ"
 
 # Merge usage: context + rate limits (space-joined)
 usage=""
 [ -n "$sec4" ] && usage="${sec4}"
 [ -n "$sec6" ] && { [ -n "$usage" ] && usage="${usage} ${sec6}" || usage="${sec6}"; }
 
-# Line 2: identity | usage | lines
+# Line 2: identity | usage(ctx + rate limits) | economics
 line2="${sec3}"
 [ -n "$usage" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${usage}" || line2="${usage}"; }
 [ -n "$sec7" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec7}" || line2="${sec7}"; }
