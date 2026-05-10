@@ -59,28 +59,25 @@ sec1="${C_HOST}$(hostname -s | tr '[:upper:]' '[:lower:]')${R}${S}:${R}${C_USER}
 sec2="${C_DIR}$(basename "$cwd")${R}"
 [ -n "$branch" ] && sec2="${sec2}${S}:${R}${C_BRANCH}${branch}${R}"
 
-# Section 3: model (no effort — effort moved to L2)
-sec3=""
-[ -n "$model" ] && sec3="${C_MODEL}${model}${R}"
-
-# Section 4: effort:window_size:ctx% (effort conditionally prefixed)
-sec4=""
-if [ -n "$ctx" ]; then
-  win=""
-  if [ -n "$ctx_size" ]; then
-    if [ "$ctx_size" -ge 1000000 ]; then
-      win="$((ctx_size / 1000000))m"
-    elif [ "$ctx_size" -ge 1000 ]; then
-      win="$((ctx_size / 1000))k"
-    fi
-  fi
-  [ -n "$effort" ] && sec4="${C_EFFORT}${effort}${R}${S}-${R}"
-  if [ -n "$win" ]; then
-    sec4="${sec4}${C_WIN}${win}${R}${S}:${R}${C_CTX}${ctx}%${R}"
-  else
-    sec4="${sec4}${C_CTX}${ctx}%${R}"
+# Section 3: identity — model:window:effort:agent
+model="${model#claude-}"; model="${model%%\[*}"; model=$(echo "$model" | sed 's/\([0-9]\)-\([0-9]\)/\1.\2/g')
+win=""
+if [ -n "$ctx_size" ]; then
+  if [ "$ctx_size" -ge 1000000 ]; then
+    win="$((ctx_size / 1000000))M"
+  elif [ "$ctx_size" -ge 1000 ]; then
+    win="$((ctx_size / 1000))k"
   fi
 fi
+sec3=""
+[ -n "$model" ] && sec3="${C_MODEL}${model}${R}" || sec3=""
+[ -n "$win" ] && { [ -n "$sec3" ] && sec3="${sec3}${S}:${R}${C_EFFORT}${win}${R}" || sec3="${C_EFFORT}${win}${R}"; }
+[ -n "$effort" ] && { [ -n "$sec3" ] && sec3="${sec3}${S}:${R}${C_EFFORT}${effort}${R}" || sec3="${C_EFFORT}${effort}${R}"; }
+[ -n "$sec3" ] && sec3="${sec3}${S}:${R}${C_AGENT}${agent}${R}" || sec3="${C_AGENT}${agent}${R}"
+
+# Section 4: usage — ctx:% + rate limits (space-joined, uniform label:percent)
+sec4=""
+[ -n "$ctx" ] && sec4="${C_WIN}ctx${R}${S}:${R}${C_CTX}${ctx}%${R}"
 
 # Section 5: thread + progress from frontmatter
 sec5=""
@@ -144,25 +141,25 @@ if [ -n "$rl7d" ]; then
   fi
 fi
 
-# Section 7: agent name (always shown, defaults to "default")
-sec7="${C_AGENT}${agent}${R}"
-
-# Line 1: identity — host:user | dir:branch | thread:progress | model:agent
+# Line 1: identity — host:user | dir:branch | thread:progress
 line1="${sec1} ${D}|${R} ${sec2}"
 [ -n "$sec5" ] && line1="${line1} ${D}|${R} ${sec5}"
-[ -n "$sec3" ] && line1="${line1} ${D}|${R} ${sec3}${S}:${R}${sec7}" || line1="${line1} ${D}|${R} ${sec7}"
 
-# Section 8: lines added/removed (hidden when both 0)
-sec8=""
+# Section 7: lines added/removed (hidden when both 0)
+sec7=""
 if [ "$lines_added" -gt 0 ] 2>/dev/null || [ "$lines_removed" -gt 0 ] 2>/dev/null; then
-  sec8="\033[38;5;65m+${lines_added}${R}${S}/${R}\033[38;5;131m-${lines_removed}${R}"
+  sec7="\033[38;5;65m+${lines_added}${R}${S}/${R}\033[38;5;131m-${lines_removed}${R}"
 fi
 
-# Line 2: config+context | rate limits | lines
-line2=""
-[ -n "$sec4" ] && line2="${sec4}"
-[ -n "$sec6" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec6}" || line2="${sec6}"; }
-[ -n "$sec8" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec8}" || line2="${sec8}"; }
+# Merge usage: context + rate limits (space-joined)
+usage=""
+[ -n "$sec4" ] && usage="${sec4}"
+[ -n "$sec6" ] && { [ -n "$usage" ] && usage="${usage} ${sec6}" || usage="${sec6}"; }
+
+# Line 2: identity | usage | lines
+line2="${sec3}"
+[ -n "$usage" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${usage}" || line2="${usage}"; }
+[ -n "$sec7" ] && { [ -n "$line2" ] && line2="${line2} ${D}|${R} ${sec7}" || line2="${sec7}"; }
 
 printf "%b\n" "$line1"
 [ -n "$line2" ] && printf "%b" "$line2"
