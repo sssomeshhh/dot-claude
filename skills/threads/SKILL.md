@@ -118,6 +118,100 @@ Numbered list of unresolved questions or tasks. Remove items as they are resolve
 (move the answer to the Decisions table).
 ```
 
+### Discussion Stack
+
+An optional section for threads with deep, multi-level design discussions. Tracks the
+nested path of sub-questions so that a new session can resume exactly where the previous
+one left off — including tentative agreements, paused branches, and the rationale for
+each transition.
+
+**When to use:** Add a Discussion Stack when a thread's open item discussions go more
+than one level deep (answering X requires answering Y which requires answering Z). Not
+every thread needs one — threads with flat, independent items don't benefit from it.
+
+**Placement:** After `## Open Items`, before any freeform sections. Use the heading
+`## Discussion Stack`.
+
+**Format:**
+
+```markdown
+## Discussion Stack
+
+XY-3: Authentication strategy
+  ✓ Token-based auth over session cookies
+    why: stateless servers simplify horizontal scaling; cookies
+    require sticky sessions or shared session store
+  ├─ Token storage
+  │   (paused)
+  │   why: storage mechanism depends on claim payload size — large
+  │   claims may exceed cookie limits; need token claims design first
+  ├─ Token format
+  │   ✓ JWT (self-contained, RS256 signed)
+  │     why: asymmetric signing lets services verify without sharing
+  │     secrets; self-contained avoids token lookup on every request
+  │   ├─ Key rotation mechanism
+  │   │   ✓ JWKS endpoint with overlap period
+  │   │     why: clients cache public keys — overlap period prevents
+  │   │     verification failures during rotation window
+  │   │   └─ Overlap duration ← CURRENT
+  │   │       ? How long should old and new keys coexist?
+  │   │       why: too short risks cache staleness; too long delays
+  │   │       revocation of compromised keys
+  │   └─ (pending) Token claims design
+  └─ (pending) Formal decision recording
+```
+
+**Markers:**
+- `✓` — tentatively agreed (not yet a formal Decision in the Decisions table)
+- `← CURRENT` — where the discussion is right now
+- `?` — the specific question currently on the table
+- `(paused)` — set aside, will return (always include reason)
+- `(pending)` — known next step, not yet started
+
+**`why` annotations:** Every `✓`, `(paused)`, and new sub-question entry should have
+a `why` annotation — one or two indented lines explaining the rationale or the reason
+for the transition. Reference decision IDs (D30, D36) where relevant. The `why` is
+what orients the next session on *how to resume*, not just *where to resume*.
+
+**Persistence model — Option D (checkpoint):**
+
+The stack is maintained as a working copy in conversation context and persisted to the
+thread file at specific checkpoints. This balances accuracy (avoiding premature writes
+of misinterpreted agreements) with recoverability (not losing state on session death).
+
+Write triggers (persist the stack to the thread file):
+- **Tentative agreement confirmed by the user** — not when you detect agreement,
+  but when the user explicitly confirms it. "Yes," "that works," "agreed" after you
+  reflect the conclusion back.
+- **Topic paused or redirected** — user says "let us come back to this," "first let
+  us discuss X," or otherwise redirects. Capture the pause reason before switching.
+- **Explicit `/threads update`** — full sync of stack alongside decisions and items.
+- **Sub-question branch completed** — all children resolved, unwinding to parent.
+
+Do NOT write on:
+- Every exchange (too noisy, premature)
+- Your own detection of agreement before user confirms (risk of mislabeling)
+- Meta/process questions that don't change the discussion tree
+- Clarifying questions or corrections
+- Tangents and casual exploration
+
+**Detection heuristic:** If answering the new question is a **prerequisite** to
+resolving the current one, it's a sub-question (add to stack). If it's exploratory,
+clarifying, or tangential, it's not (don't add to stack).
+
+**Lifecycle:**
+- Stack entries are **tentative** — they become formal Decisions only when the branch
+  is fully resolved and the user confirms the conclusion.
+- When a branch is fully resolved, promote its tentative agreements to the Decisions
+  table, remove the branch from the stack, and mark the parent item accordingly.
+- When all branches of a root item are resolved, collapse the entire stack entry.
+- A cleared stack means the thread's Discussion Stack section can be removed.
+
+**Critical rule — use the user's framing:** When recording tentative agreements,
+capture what the user actually said and agreed to, not your summarized label. If the
+user proposed "teams are advisory only, not in auth chain," don't record it as
+"Option A agreed." Mislabeled summaries mislead future sessions.
+
 ### Freeform Sections
 
 Add whatever sections make sense for the topic after the core sections. Examples from
@@ -239,8 +333,9 @@ always add the inverse to the other:
 
 ## INDEX.md Generation
 
-INDEX.md is **auto-generated** from thread frontmatter. Regenerate it whenever a thread
-is created, updated, merged, forked, or has its status changed.
+INDEX.md is **auto-generated** from thread frontmatter by the generate script
+(`~/.claude/skills/threads/scripts/generate.py`). The script is invoked by the skill
+after each operation that modifies frontmatter.
 
 **Format:**
 
@@ -280,9 +375,8 @@ Threads without explicit `priority:` show `P2`.
 
 ## GRAPH.md Generation
 
-GRAPH.md is **auto-generated** from thread frontmatter, parallel to INDEX.md. Regenerate
-it whenever INDEX.md is regenerated — same triggers (create, update, close, merge, fork,
-link, rename, and explicit index).
+GRAPH.md is **auto-generated** from thread frontmatter, parallel to INDEX.md. Generated
+by the same script invocation that produces INDEX.md.
 
 **File structure:**
 
@@ -395,7 +489,7 @@ is already set up.
 When the user asks what threads are available, or invokes `/threads` with no arguments:
 
 1. Read all thread files in the threads directory
-2. Regenerate INDEX.md and GRAPH.md from frontmatter (ensures it is current)
+2. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 3. Present the INDEX.md table to the user
 4. Check `last_updated` on all active and blocked threads. If any are older than 14 days,
    append a stale thread warning after the table listing thread names and age in days
@@ -412,6 +506,17 @@ When the user invokes `/threads <name>` or `/threads load <name>`:
    sed -i "s/^${CLAUDE_SESSION_ID}=.*/${CLAUDE_SESSION_ID}=thread-name/" .claude/threads/.state
    ```
 5. Present the thread's current state to the user
+6. **If the thread has a `## Discussion Stack` section**, present it prominently after
+   the summary — this tells you where the previous session left off. Identify the
+   `← CURRENT` marker and frame it as the resumption point. Example:
+   ```
+   **Resuming discussion:**
+   Currently on: Overlap duration (under Token format > Key rotation mechanism > XY-3)
+   Question on the table: How long should old and new keys coexist?
+   ```
+   The stack is the primary orientation tool — it tells you not just what's open, but
+   where in the discussion tree the user was and what tentative agreements exist at
+   each level above.
 
 ### Create Thread
 
@@ -422,7 +527,7 @@ When the user wants to start a new topic:
 3. Derive `id_prefix` from filename (first letter of each word, uppercase) — suggest to user, allow override
 4. Create the file with frontmatter (status: active, progress: 0o/0r/0d, id_prefix) and empty core sections
 5. Fill in Context based on what the user describes
-6. Regenerate INDEX.md and GRAPH.md
+6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 7. Update `.claude/threads/.state` via Bash/sed (see .state File section)
 
 ### Capture From Conversation
@@ -436,11 +541,16 @@ When the user says "save this as a thread" or "turn this into a thread" mid-conv
 5. Create the thread file with populated sections, `id_prefix`, and `items:` list
    (assign IDs to any captured open items, add inline `[ID]` tags)
 6. Present the draft to the user for review before finalizing
-7. Regenerate INDEX.md and GRAPH.md
+7. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 8. Update `.claude/threads/.state` via Bash/sed (see .state File section)
 
 This is different from Create — it retroactively structures an existing conversation
 rather than starting blank.
+
+If the conversation being captured contains nested design discussions (sub-questions
+explored to answer a parent question), also create a `## Discussion Stack` section
+capturing the current discussion tree, tentative agreements, and where the
+conversation left off.
 
 ### Update Thread
 
@@ -450,9 +560,36 @@ When decisions are made or the situation changes during a conversation:
 2. Resolve open items (move to Decisions when answered, remove from Open Items and `items:` list)
 3. Add new open items as they surface (assign next ID using thread's `id_prefix`, add to both inline and `items:` list)
 4. Update frontmatter: summary, status if changed, last_updated, recompute progress from `items:`, sync `items:` with inline Open Items
-5. Regenerate INDEX.md and GRAPH.md if frontmatter changed
+5. **Update the Discussion Stack** if one exists (see below)
+6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash if frontmatter changed
 
 Update incrementally — append to existing content, don't rewrite settled sections.
+
+**Discussion Stack maintenance during Update:**
+
+If the thread has an active Discussion Stack, sync it with the current conversation state:
+- Promote fully-resolved branches: if all sub-questions under a tentative agreement
+  are settled and the conclusion is confirmed, move it from the stack to the Decisions
+  table. Remove the resolved branch from the stack.
+- Update markers: move `← CURRENT` to reflect where the discussion actually is.
+  Add `✓` to newly confirmed agreements. Add `(paused)` to branches that were set aside.
+- Add new branches: if sub-questions opened since the last checkpoint, add them with
+  `why` annotations.
+- Ensure `why` annotations are present on all `✓`, `(paused)`, and sub-question entries.
+- If the entire stack is resolved (all branches promoted to Decisions), remove the
+  `## Discussion Stack` section.
+
+**Discussion Stack maintenance between Updates (implicit checkpoints):**
+
+During active design discussions on a loaded thread, persist the stack to the thread
+file at these moments — even without an explicit `/threads update`:
+- User confirms a tentative agreement (add `✓` + `why`)
+- User pauses or redirects the discussion (add `(paused)` + `why`, open new branch)
+- A sub-question branch is fully resolved (promote or collapse)
+
+These implicit checkpoints only write the `## Discussion Stack` section — they do NOT
+trigger Decision table updates, frontmatter recomputation, or derived artifact
+regeneration. Those happen on explicit `/threads update` only.
 
 ### Close Thread
 
@@ -466,7 +603,7 @@ When a topic is complete:
 2. Set status to `closed`, update summary, clear `items:` list (should be empty —
    all items resolved or moved), recompute progress (should be `0o/Yr/Zd`)
 3. Update last_updated
-4. Regenerate INDEX.md and GRAPH.md (thread moves to Closed section)
+4. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash (thread moves to Closed section)
 
 ### Merge Threads
 
@@ -483,7 +620,7 @@ When two threads converge into one topic:
 3. Union the Related links from both threads
 4. Close the source thread with status `closed` and summary "merged into [target]"
 5. Add `supersedes: [source]` to target, `superseded-by: [target]` to source
-6. Regenerate INDEX.md and GRAPH.md
+6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 
 If decisions conflict between threads, present both to the user and ask which stands.
 
@@ -499,7 +636,7 @@ When a thread spawns a clearly separate subtopic:
 4. Remove the forked content from the original thread (remove from both inline
    Open Items and `items:` list, retire the old IDs)
 5. Add `parent: [original]` to new thread, `child: [new]` to original
-6. Regenerate INDEX.md and GRAPH.md
+6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 
 ### Link Threads
 
@@ -508,7 +645,7 @@ When the user wants to express a relationship between threads:
 1. Identify the relationship type (ask if ambiguous)
 2. Add the relationship to the source thread's frontmatter
 3. Auto-sync the inverse to the target thread
-4. Regenerate INDEX.md and GRAPH.md
+4. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 
 ### Rename Thread
 
@@ -519,7 +656,7 @@ When a thread's scope has evolved and the filename no longer fits:
 3. Rename the file
 4. Update the `# Thread Title` heading inside the file to match
 5. Update all `related` references in other threads that point to the old filename
-6. Regenerate INDEX.md and GRAPH.md
+6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
 7. If the renamed thread is currently loaded (old name matches this session's `.claude/threads/.state` entry), update the entry to the new name via Bash/sed (see .state File section)
 
 ### Search
@@ -672,4 +809,4 @@ and last-updated), offer to migrate them:
 1. Extract metadata from inline fields into YAML frontmatter
 2. Restructure into core sections if needed
 3. Strip behavioral instructions from INDEX.md (the skill owns that behavior now)
-4. Regenerate INDEX.md and GRAPH.md from the new frontmatter
+4. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
