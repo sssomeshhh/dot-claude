@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 input=$(cat)
-cwd=$(echo "$input" | jq -r '.cwd')
+cwd=$(echo "$input" | jq -r '.workspace.project_dir // .cwd')
+git_cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd')
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 model=$(echo "$input" | jq -r '.model.id // empty')
 ctx=$(echo "$input" | jq -r '.context_window.used_percentage // empty' | cut -d. -f1)
@@ -14,8 +15,8 @@ lines_added=$(echo "$input" | jq -r '.cost.total_lines_added // "0"')
 lines_removed=$(echo "$input" | jq -r '.cost.total_lines_removed // "0"')
 effort="${CLAUDE_CODE_EFFORT_LEVEL:-}"
 
-# Git branch from cwd
-branch=$(git -C "$cwd" rev-parse --abbrev-ref HEAD 2>/dev/null)
+# Git branch from current_dir (reflects worktrees correctly)
+branch=$(git -C "$git_cwd" rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 # Thread name from state file
 thread=""
