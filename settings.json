@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/sh/.claude/hooks/session-start.sh"
+            "command": "$HOME/.claude/hooks/session-start.sh"
           }
         ]
       }
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/sh/.claude/hooks/session-end.sh"
+            "command": "$HOME/.claude/hooks/session-end.sh"
           }
         ]
       }
@@ -48,7 +48,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash /home/sh/.claude/scripts/statusline.sh"
+    "command": "bash $HOME/.claude/scripts/statusline.sh"
   },
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
