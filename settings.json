@@ -55,9 +55,13 @@
     "frontend-design@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true
   },
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "autoUpdatesChannel": "latest",
   "tui": "default",
+  "theme": "auto",
+  "editorMode": "normal",
+  "verbose": true,
+  "autoCompactEnabled": true,
   "teammateMode": "auto",
   "skipAutoPermissionPrompt": true,
   "autoMode": {
@@ -112,6 +116,5 @@
       "**Trusted cloud buckets**: None configured",
       "**Key internal services**: None configured"
     ]
-  },
-  "verbose": true
+  }
 }
