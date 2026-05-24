@@ -10,6 +10,7 @@ ITEMS=(
   keybindings.json
   settings.json
   hooks
+  marketplaces
   scripts
   skills
 )
