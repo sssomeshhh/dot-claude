@@ -23,13 +23,21 @@ cost_usd=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 # Git branch from current_dir (reflects worktrees correctly)
 branch=$(git -C "$git_cwd" rev-parse --abbrev-ref HEAD 2>/dev/null)
 
-# Worktree indicator: "root" when at project root, else relpath to worktree top
+# Main repo root (parent of git common-dir) and current worktree top
+common_dir=$(git -C "$git_cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+repo_root=""
+[ -n "$common_dir" ] && repo_root=$(dirname "$common_dir")
 wt_top=$(git -C "$git_cwd" rev-parse --show-toplevel 2>/dev/null)
+
+# Worktree slot: "root" in the main worktree, else relpath from
+# repo root to the worktree folder's parent dir.
 wt=""
-if [ -n "$wt_top" ] && [ "$wt_top" = "$cwd" ]; then
-  wt="root"
-elif [ -n "$wt_top" ]; then
-  wt=$(realpath --relative-to="$cwd" "$wt_top" 2>/dev/null)
+if [ -n "$wt_top" ] && [ -n "$repo_root" ]; then
+  if [ "$wt_top" = "$repo_root" ]; then
+    wt="root"
+  else
+    wt=$(realpath --relative-to="$repo_root" "$(dirname "$wt_top")" 2>/dev/null)
+  fi
 fi
 
 # Thread name from state file
@@ -74,8 +82,8 @@ fi
 sec1="${C_HOST}$(hostname -s | tr '[:upper:]' '[:lower:]')${R}${S}:${R}${C_USER}$(whoami)${R}"
 [ -n "$version" ] && sec1="${sec1}${S}:${R}${C_MUTED}${version}${R}"
 
-# Section 2: dir:branch:wt
-sec2="${C_DIR}$(basename "$cwd")${R}"
+# Section 2: repo-root-dir:branch:worktree-parent-relpath
+sec2="${C_DIR}$(basename "${repo_root:-$cwd}")${R}"
 [ -n "$branch" ] && sec2="${sec2}${S}:${R}${C_BRANCH}${branch}${R}"
 [ -n "$wt" ] && sec2="${sec2}${S}:${R}${C_MUTED}${wt}${R}"
 
