@@ -46,8 +46,12 @@ downloads/
 # Telemetry (runtime)
 telemetry/
 
-# Per-session thread pointer (session_id → thread_name; per-machine ephemeral)
+# Per-project Claude Code state (runtime; track only conversation threads)
+.claude/*
+!.claude/threads/
 .claude/threads/.state
+.claude/threads/INDEX.md
+.claude/threads/GRAPH.md
 
 # Python bytecode caches
 __pycache__/
