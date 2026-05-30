@@ -40,13 +40,31 @@ points to it, use that location instead. Otherwise, always use the default.
 
 ## .state File
 
-The `.claude/threads/.state` file tracks which thread is active per session. **Always
-update it using `Bash` with `sed`, never using the `Edit` tool.** The Edit tool may
-prompt for permissions on dotfiles inside `.claude/` subdirectories, while Bash/sed
-runs without prompting.
+The active-thread pointer (one line per session, `<session-id>=<thread>`) lives at
+**`.claude/memory/.threads-state`**, resolved to the **primary git worktree** so that
+sessions running inside linked worktrees — each with a different cwd — share one pointer
+instead of forking per worktree. The thread files themselves are git-tracked, so they stay
+**local to the current worktree** and travel with the branch they belong to. The
+`SessionStart` hook resolves both once (the shared pointer via
+`git rev-parse --git-common-dir`, falling back to the session cwd outside a git repo) and
+exports two variables; **always use these, never a hand-built path:**
+
+| Variable | Resolves to |
+|----------|-------------|
+| `CLAUDE_THREADS_DIR` | `<this-worktree>/.claude/threads` — git-tracked thread files; pass it wherever an operation says `generate.py <threads-dir>` |
+| `CLAUDE_THREADS_STATE` | `<primary-worktree>/.claude/memory/.threads-state` — the shared, untracked active-thread pointer |
+
+`.threads-state` lives in the gitignored `.claude/memory/` dir, so it is never committed.
+
+**Update it with `Bash`, never the `Edit` tool** (Edit prompts for permission on dotfiles
+under `.claude/`). Use this insert-safe, portable idiom — it works whether or not the
+session's line already exists, on both BSD and GNU userlands (no `sed -i`):
 
 ```bash
-sed -i "s/^${CLAUDE_SESSION_ID}=.*/${CLAUDE_SESSION_ID}=thread-name/" .claude/threads/.state
+f="$CLAUDE_THREADS_STATE"
+grep -v "^${CLAUDE_SESSION_ID}=" "$f" > "$f.tmp" 2>/dev/null
+echo "${CLAUDE_SESSION_ID}=thread-name" >> "$f.tmp"
+mv "$f.tmp" "$f"
 ```
 
 ## Thread Format
@@ -501,9 +519,11 @@ When the user invokes `/threads <name>` or `/threads load <name>`:
 1. Resolve the thread name to a file in the threads directory
 2. If the file does not exist, inform the user — do not fall through to Create
 3. Read the thread file's full contents into context
-4. Update `.claude/threads/.state` via Bash/sed (see .state File section — never use Edit):
+4. Update the active-thread pointer with Bash (see .state File section — never use Edit):
    ```bash
-   sed -i "s/^${CLAUDE_SESSION_ID}=.*/${CLAUDE_SESSION_ID}=thread-name/" .claude/threads/.state
+   f="$CLAUDE_THREADS_STATE"
+   grep -v "^${CLAUDE_SESSION_ID}=" "$f" > "$f.tmp" 2>/dev/null
+   echo "${CLAUDE_SESSION_ID}=thread-name" >> "$f.tmp"; mv "$f.tmp" "$f"
    ```
 5. Present the thread's current state to the user
 6. **If the thread has a `## Discussion Stack` section**, present it prominently after
@@ -528,7 +548,7 @@ When the user wants to start a new topic:
 4. Create the file with frontmatter (status: active, progress: 0o/0r/0d, id_prefix) and empty core sections
 5. Fill in Context based on what the user describes
 6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
-7. Update `.claude/threads/.state` via Bash/sed (see .state File section)
+7. Update `$CLAUDE_THREADS_STATE` via Bash (see .state File section)
 
 ### Capture From Conversation
 
@@ -542,7 +562,7 @@ When the user says "save this as a thread" or "turn this into a thread" mid-conv
    (assign IDs to any captured open items, add inline `[ID]` tags)
 6. Present the draft to the user for review before finalizing
 7. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
-8. Update `.claude/threads/.state` via Bash/sed (see .state File section)
+8. Update `$CLAUDE_THREADS_STATE` via Bash (see .state File section)
 
 This is different from Create — it retroactively structures an existing conversation
 rather than starting blank.
@@ -657,7 +677,7 @@ When a thread's scope has evolved and the filename no longer fits:
 4. Update the `# Thread Title` heading inside the file to match
 5. Update all `related` references in other threads that point to the old filename
 6. Regenerate derived artifacts: run `python3 ~/.claude/skills/threads/scripts/generate.py <threads-dir>` via Bash
-7. If the renamed thread is currently loaded (old name matches this session's `.claude/threads/.state` entry), update the entry to the new name via Bash/sed (see .state File section)
+7. If the renamed thread is currently loaded (old name matches this session's `$CLAUDE_THREADS_STATE` entry), update the entry to the new name via Bash (see .state File section)
 
 ### Search
 
