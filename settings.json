@@ -16,14 +16,20 @@
       "LS",
       "MultiEdit"
     ],
-    "deny": [
-      "Read(*/.env)",
-      "Read(*/.env.*)",
-      "Read(*/secrets/**)"
-    ],
     "defaultMode": "auto"
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/guard-secret-paths.sh"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",
