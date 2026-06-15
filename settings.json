@@ -12,9 +12,7 @@
       "WebFetch",
       "WebSearch",
       "Grep",
-      "Glob",
-      "LS",
-      "MultiEdit"
+      "Glob"
     ],
     "defaultMode": "auto"
   },
@@ -72,12 +70,12 @@
   "effortLevel": "xhigh",
   "autoUpdatesChannel": "latest",
   "tui": "default",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "editorMode": "normal",
   "verbose": true,
   "autoCompactEnabled": true,
   "teammateMode": "auto",
-  "skipAutoPermissionPrompt": true,
-  "skipDangerousModePermissionPrompt": true,
-  "skipWorkflowUsageWarning": true
+  "skipAutoPermissionPrompt": true
 }
