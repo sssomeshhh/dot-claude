@@ -114,12 +114,9 @@ if [ -n "$thread" ] && [ "$thread" != "none" ]; then
   sec5="${C_THREAD}${thread}${R}"
   thread_file="$cwd/.claude/threads/${thread}.md"
   if [ -f "$thread_file" ]; then
-    progress=$(sed -n '/^---$/,/^---$/{ s/^progress: *//p }' "$thread_file" | head -1)
-    if [ -n "$progress" ]; then
-      o=$(echo "$progress" | grep -oP '\d+(?=o)'); o=${o:-0}
-      r=$(echo "$progress" | grep -oP '\d+(?=r)') ; r=${r:-0}
-      d=$(echo "$progress" | grep -oP '\d+(?=d)') ; d=${d:-0}
-      total=$((o + r + d))
+    progress=$(grep -m1 '^progress:' "$thread_file" | cut -d: -f2- | tr -d ' ')
+    if [[ "$progress" =~ ^([0-9]+)o/([0-9]+)r/([0-9]+)d$ ]]; then
+      total=$(( ${BASH_REMATCH[1]} + ${BASH_REMATCH[2]} + ${BASH_REMATCH[3]} ))
       if [ "$total" -gt 0 ]; then
         sec5="${sec5}${S}:${R}${C_PROGRESS}${progress}${R}"
       fi
