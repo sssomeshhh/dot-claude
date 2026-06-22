@@ -80,8 +80,8 @@ surface see the [official docs](#official-docs). Notable choices:
 - **Skip-prompt flags** (`skipAutoPermissionPrompt`, `skipDangerousModePermissionPrompt`,
   `skipWorkflowUsageWarning`) — trade confirmation dialogs for flow; see
   [caveats](#caveats-for-adopters).
-- **`enabledPlugins`** — `skill-creator`, `frontend-design`, `superpowers` (from the official
-  marketplace). Plugin *code* isn't vendored; it's restored from these names.
+- **`enabledPlugins`** — 25 plugins enabled; the code isn't vendored, the names are just
+  restored on startup. See the [Plugins](#plugins) section below.
 - **Hook wiring** — points the three lifecycle events at `hooks/` (below).
 - **`statusLine`** — runs `scripts/statusline.sh`.
 - **`env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"`** — opts into agent teams.
@@ -121,6 +121,61 @@ lines added/removed, and — when a thread is loaded — its name and progress.
 
 Currently an empty, schema-anchored placeholder (`"bindings": []`) — no custom keys yet, kept tracked
 so overrides have a versioned home when needed.
+
+## Plugins
+
+25 plugins are enabled via `settings.json` → `enabledPlugins`, all from the official
+[`claude-plugins-official`](https://github.com/anthropics/claude-plugins-official) marketplace —
+the code isn't vendored, the names are just restored on startup. Grouped by what they do:
+
+**Claude Code authoring & config**
+
+- [skill-creator](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/skill-creator) — Create, improve, and eval Claude Code skills
+- [claude-md-management](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-md-management) — Audit and keep CLAUDE.md files current
+- [claude-code-setup](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup) — Recommends tailored Claude Code automations (hooks, skills, MCP, agents)
+- [hookify](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/hookify) — Create custom hooks from conversation patterns or instructions
+- [explanatory-output-style](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/explanatory-output-style) — Educational notes on implementation choices and patterns
+- [remember](https://github.com/Digital-Process-Tools/claude-remember) — Continuous memory — compresses conversations into daily logs
+
+**Feature development**
+
+- [feature-dev](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/feature-dev) — Feature workflow — explore → architect → review agents
+- [superpowers](https://github.com/obra/superpowers) — Brainstorming, subagent-driven dev, TDD, debugging, skill authoring
+- [ralph-loop](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop) — Self-referential iterative loops (the Ralph technique) until a task is done
+
+**Frontend & UI**
+
+- [frontend-design](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/frontend-design) — Distinctive, production-grade frontend UI generation
+- [playground](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/playground) — Build interactive single-file HTML playgrounds
+
+**Code review & quality**
+
+- [code-review](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-review) — Multi-agent automated PR review with confidence scoring
+- [pr-review-toolkit](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pr-review-toolkit) — Specialized PR-review agents (tests, types, errors, quality)
+- [code-simplifier](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/code-simplifier) — Simplifies recently-changed code while preserving behavior
+- [security-guidance](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/security-guidance) — Security review of generated code (injection, XSS, secrets, and more)
+
+**Browser & web debugging**
+
+- [playwright](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/playwright) — Microsoft Playwright MCP — browser automation and e2e testing
+- [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) — Drive and inspect a live Chrome — perf, network, console, automation
+
+**Version control**
+
+- [github](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/github) — Official GitHub MCP — issues, PRs, repo and API access
+- [commit-commands](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/commit-commands) — Git commit / push / PR-creation commands
+
+**Language servers**
+
+- [typescript-lsp](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/typescript-lsp) — TypeScript / JavaScript language server
+- [pyright-lsp](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/pyright-lsp) — Python language server (Pyright) — types & code intelligence
+- [clangd-lsp](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/clangd-lsp) — C / C++ language server (clangd)
+- [kotlin-lsp](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/kotlin-lsp) — Kotlin language server
+- [jdtls-lsp](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/jdtls-lsp) — Java language server (Eclipse JDT.LS)
+
+**Integrations**
+
+- [telegram](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/telegram) — Telegram messaging bridge with access control
 
 ## Caveats for adopters
 
