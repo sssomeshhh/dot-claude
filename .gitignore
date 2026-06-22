@@ -49,7 +49,6 @@ telemetry/
 # Per-project Claude Code state (runtime; track only conversation threads)
 .claude/*
 !.claude/threads/
-.claude/threads/.state
 .claude/threads/INDEX.md
 .claude/threads/GRAPH.md
 

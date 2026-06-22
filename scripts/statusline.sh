@@ -42,7 +42,7 @@ fi
 
 # Thread name from state file
 thread=""
-state_file="$cwd/.claude/threads/.state"
+state_file="${repo_root:-$cwd}/.claude/memory/.threads-state"
 if [ -n "$session_id" ] && [ -f "$state_file" ]; then
   thread=$(grep "^${session_id}=" "$state_file" 2>/dev/null | cut -d= -f2-)
 fi
