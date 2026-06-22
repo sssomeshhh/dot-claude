@@ -49,7 +49,7 @@ The value of this repo is the curation. **Tracked** — the durable config you'd
 | `keybindings.json` | Key-binding overrides (currently none — a schema-anchored placeholder) |
 | `hooks/` | Lifecycle shell hooks (session start/end, secret-path guard) |
 | `scripts/statusline.sh` | Custom status-line renderer |
-| `skills/` | Custom skills (`threads/`) |
+| `skills/` | Custom skills — see [Skills](#skills) |
 | `configure` | The symlink installer itself |
 
 **Ignored** (via `.gitignore`) — everything the tool regenerates or that's sensitive: per-project
@@ -102,14 +102,6 @@ Three lifecycle hooks, wired in `settings.json`. Each parses its JSON stdin with
 - **`session-end.sh`** (`SessionEnd`) — removes this session's line from the shared pointer file on
   exit.
 
-### `skills/threads/`
-
-A skill for **resumable conversation threads** — durable markdown summaries (in `.claude/threads/`)
-with YAML frontmatter capturing decisions, open items, and discussion state, so a topic can span many
-sessions. Supports create / load / update / close / merge / fork / link, plus cross-thread priority
-and backlog views, and auto-generates an `INDEX.md` and a Mermaid `GRAPH.md`. This is what the
-`CLAUDE.md` "Conversation Threads" pointer refers to.
-
 ### `scripts/statusline.sh`
 
 Renders a dense two-line status line from the JSON Claude Code feeds it: host / user / version,
@@ -121,6 +113,12 @@ lines added/removed, and — when a thread is loaded — its name and progress.
 
 Currently an empty, schema-anchored placeholder (`"bindings": []`) — no custom keys yet, kept tracked
 so overrides have a versioned home when needed.
+
+## Skills
+
+Custom skills authored in this repo, loaded from `~/.claude/skills/`:
+
+- [threads](skills/threads/SKILL.md) — resumable conversation threads: durable markdown summaries in `.claude/threads/` (YAML frontmatter for decisions, open items, and discussion state), with `INDEX.md` + Mermaid `GRAPH.md` generation and cross-thread priority/backlog views — the workflow behind `CLAUDE.md`’s "Conversation Threads" pointer.
 
 ## Plugins
 
