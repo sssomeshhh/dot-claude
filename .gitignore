@@ -7,13 +7,13 @@ history.jsonl
 # Usage statistics cache
 stats-cache.json
 
-# Per-project session logs and memory (260M+, project-scoped not user-scoped)
+# Per-project session logs and memory (project-scoped not user-scoped)
 projects/
 
-# Debug logs (129M+, transient)
+# Debug logs (transient)
 debug/
 
-# File edit history (17M+, transient)
+# File edit history (transient)
 file-history/
 
 # Plugins downloaded from marketplace (reproducible via settings.json enabledPlugins)

@@ -8,11 +8,11 @@ by `./configure`.
 
 `~/.claude` mixes two very different things: a little durable configuration you author by hand, and a
 lot of runtime state the tool regenerates (session logs, caches, downloaded plugins, per-project
-memory — hundreds of MB). This repo tracks only the first kind, so the setup is:
+memory — far larger than the config itself). This repo tracks only the first kind, so the setup is:
 
 - **Reproducible** — clone, run `./configure`, and a new machine has the same configuration.
 - **Reviewable** — every change to how the agent behaves is a diff in git history.
-- **Quiet** — the gigabytes of regenerated state stay out of the way (see
+- **Quiet** — the bulk of regenerated state stays out of the way (see
   [What's tracked](#whats-tracked-and-what-isnt)).
 
 ## Install
@@ -53,7 +53,7 @@ The value of this repo is the curation. **Tracked** — the durable config you'd
 | `configure` | The symlink installer itself |
 
 **Ignored** (via `.gitignore`) — everything the tool regenerates or that's sensitive: per-project
-session logs and memory (`projects/`, 260 MB+), debug logs, file-edit history, downloaded `plugins/`
+session logs and memory (`projects/`), debug logs, file-edit history, downloaded `plugins/`
 (reproducible from `enabledPlugins` in `settings.json`), assorted caches, ephemeral session runtime,
 and secrets (`.credentials.json`, `history.jsonl`).
 
@@ -72,7 +72,7 @@ to the threads workflow. Project-specific guidance belongs in each project's own
 ### `settings.json`
 
 User-scope Claude Code settings. This repo documents the *choices*, not every key — for the full
-surface see the [official reference](https://code.claude.com/docs). Notable choices:
+surface see the [official docs](#official-docs). Notable choices:
 
 - **`effortLevel: xhigh`** — bias toward thorough reasoning by default.
 - **`permissions.defaultMode: auto`** with a tool allow-list (`Bash`, `Read`, `Edit`, `Write`,
